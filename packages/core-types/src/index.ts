@@ -2,6 +2,7 @@ export type RiskLevel = "low" | "medium" | "high" | "critical";
 
 export type SafetyMode =
   | "observe_only"
+  | "strict"
   | "human_confirmation_required"
   | "supervised_simulation"
   | "emergency_locked";
@@ -46,6 +47,9 @@ export interface PermissionRequest {
   appId: string;
   deviceId: string;
   capabilityId: string;
+  app: AppIdentity;
+  device: Device;
+  capability: DeviceCapability;
   requestedAccessType: AccessType;
   purpose: string;
   createdAt: string;
@@ -53,13 +57,13 @@ export interface PermissionRequest {
 }
 
 export interface PolicyDecision {
-  id: string;
   requestId: string;
-  outcome: "allow" | "deny" | "requires_confirmation";
+  decision: "allow" | "deny";
   riskLevel: RiskLevel;
   reason: string;
+  requiresApproval: boolean;
+  audit: boolean;
   humanReadableSummary: string;
-  createdAt: string;
   simulationOnly: true;
 }
 
@@ -86,8 +90,8 @@ export const riskLevels: readonly RiskLevel[] = [
 
 export const safetyModes: readonly SafetyMode[] = [
   "observe_only",
+  "strict",
   "human_confirmation_required",
   "supervised_simulation",
   "emergency_locked"
 ];
-
