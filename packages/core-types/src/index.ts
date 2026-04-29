@@ -80,6 +80,7 @@ export interface AuditEvent {
   reason: string;
   requiresApproval: boolean;
   audit: boolean;
+  sandboxed: boolean;
   humanReadableSummary: string;
   simulationOnly: true;
 }

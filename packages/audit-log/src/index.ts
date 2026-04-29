@@ -42,6 +42,7 @@ export function createAuditEvent(
     reason: decision.reason,
     requiresApproval: decision.requiresApproval,
     audit: decision.audit,
+    sandboxed: false,
     humanReadableSummary: `${decision.decision.toUpperCase()} ${request.app.name} -> ${request.device.name}/${request.capability.name}: ${decision.reason}`,
     simulationOnly: true
   };
@@ -56,4 +57,3 @@ export function logDecision(
   auditLog.record(event);
   return event;
 }
-

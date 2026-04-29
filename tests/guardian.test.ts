@@ -21,6 +21,7 @@ function event(input: {
     reason: "Test audit event.",
     requiresApproval: input.riskLevel === "critical",
     audit: true,
+    sandboxed: false,
     humanReadableSummary: "Test audit event.",
     simulationOnly: true
   };
@@ -80,4 +81,3 @@ describe("Guardian", () => {
     expect(result.reason).toContain("Critical request presence detected");
   });
 });
-
