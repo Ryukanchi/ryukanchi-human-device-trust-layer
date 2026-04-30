@@ -8,12 +8,43 @@ export type SafetyMode =
   | "emergency_locked";
 
 export type AccessType =
+  | "read"
   | "read_status"
   | "read_sensor"
   | "display_overlay"
   | "adjust_feedback"
   | "motor_assist"
   | "audit_read";
+
+export type DeviceType = "wearable_health_sensor";
+
+export type DataSensitivity =
+  | "low"
+  | "moderate"
+  | "sensitive"
+  | "highly_sensitive";
+
+export type BodyImpact =
+  | "none"
+  | "informational"
+  | "perceptual"
+  | "assistive"
+  | "actuation";
+
+export type ConsentPurpose =
+  | "user_view"
+  | "wellness_summary"
+  | "rehab_tracking"
+  | "safety_monitoring"
+  | "device_maintenance"
+  | "research_simulation"
+  | "advertising";
+
+export type RetentionHint =
+  | "ephemeral"
+  | "session"
+  | "short_term"
+  | "not_recommended";
 
 export interface DeviceCapability {
   id: string;
