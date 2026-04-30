@@ -7,8 +7,12 @@ import type {
   PermissionRequest,
   PolicyDecision
 } from "../packages/core-types/src/index.js";
+import {
+  createDecisionContext,
+  type PolicyEngine
+} from "../packages/decision-context/src/index.js";
 import { evaluatePermission } from "../packages/policy-engine/src/index.js";
-import { SandboxEngine, type PolicyEngine } from "../packages/sandbox/src/index.js";
+import { SandboxEngine } from "../packages/sandbox/src/index.js";
 
 const trustedApp: AppIdentity = {
   id: "app-trusted",
@@ -98,13 +102,14 @@ const allowMediumPolicy: PolicyEngine = (request): PolicyDecision => ({
 describe("SandboxEngine", () => {
   it("returns allowed for low-risk allowed requests", () => {
     const auditLog = new AuditLog();
-    const engine = new SandboxEngine(evaluatePermission, auditLog);
+    const engine = new SandboxEngine(auditLog);
+    const request = makeRequest({
+      id: "request-low",
+      app: trustedApp,
+      capability: lowCapability
+    });
     const result = engine.execute(
-      makeRequest({
-        id: "request-low",
-        app: trustedApp,
-        capability: lowCapability
-      })
+      createDecisionContext(request, evaluatePermission)
     );
 
     expect(result.mode).toBe("allowed");
@@ -114,13 +119,14 @@ describe("SandboxEngine", () => {
 
   it("returns sandboxed for medium-risk allowed requests", () => {
     const auditLog = new AuditLog();
-    const engine = new SandboxEngine(allowMediumPolicy, auditLog);
+    const engine = new SandboxEngine(auditLog);
+    const request = makeRequest({
+      id: "request-medium",
+      app: trustedApp,
+      capability: mediumCapability
+    });
     const result = engine.execute(
-      makeRequest({
-        id: "request-medium",
-        app: trustedApp,
-        capability: mediumCapability
-      })
+      createDecisionContext(request, allowMediumPolicy)
     );
 
     expect(result.mode).toBe("sandboxed");
@@ -130,13 +136,14 @@ describe("SandboxEngine", () => {
 
   it("returns denied for high-risk denied requests", () => {
     const auditLog = new AuditLog();
-    const engine = new SandboxEngine(evaluatePermission, auditLog);
+    const engine = new SandboxEngine(auditLog);
+    const request = makeRequest({
+      id: "request-high",
+      app: untrustedApp,
+      capability: highCapability
+    });
     const result = engine.execute(
-      makeRequest({
-        id: "request-high",
-        app: untrustedApp,
-        capability: highCapability
-      })
+      createDecisionContext(request, evaluatePermission)
     );
 
     expect(result.mode).toBe("denied");
@@ -146,14 +153,15 @@ describe("SandboxEngine", () => {
 
   it("logs sandbox execution with a sandbox flag", () => {
     const auditLog = new AuditLog();
-    const engine = new SandboxEngine(allowMediumPolicy, auditLog);
+    const engine = new SandboxEngine(auditLog);
+    const request = makeRequest({
+      id: "request-sandbox-log",
+      app: trustedApp,
+      capability: mediumCapability
+    });
 
     engine.execute(
-      makeRequest({
-        id: "request-sandbox-log",
-        app: trustedApp,
-        capability: mediumCapability
-      })
+      createDecisionContext(request, allowMediumPolicy)
     );
 
     const events = auditLog.getAll();
@@ -163,4 +171,3 @@ describe("SandboxEngine", () => {
     expect(events[0]?.humanReadableSummary).toContain("simulation sandbox");
   });
 });
-

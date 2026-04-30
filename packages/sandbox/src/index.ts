@@ -5,6 +5,7 @@ import type {
 } from "../../core-types/src/index.js";
 import type { AuditLog } from "../../audit-log/src/index.js";
 import { createAuditEvent } from "../../audit-log/src/index.js";
+import type { DecisionContext } from "../../decision-context/src/index.js";
 
 export interface SandboxResult {
   mode: "allowed" | "sandboxed" | "denied";
@@ -12,16 +13,11 @@ export interface SandboxResult {
   simulated: boolean;
 }
 
-export type PolicyEngine = (request: PermissionRequest) => PolicyDecision;
-
 export class SandboxEngine {
-  constructor(
-    private readonly policyEngine: PolicyEngine,
-    private readonly auditLog: AuditLog
-  ) {}
+  constructor(private readonly auditLog: AuditLog) {}
 
-  execute(request: PermissionRequest): SandboxResult {
-    const decision = this.policyEngine(request);
+  execute(context: DecisionContext): SandboxResult {
+    const { request, policyDecision: decision } = context;
     const mode = this.getMode(decision);
     const auditEvent = this.createExecutionEvent(request, decision, mode);
 
@@ -85,4 +81,3 @@ export class SandboxEngine {
     };
   }
 }
-

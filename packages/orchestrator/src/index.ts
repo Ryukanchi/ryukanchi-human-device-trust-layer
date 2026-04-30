@@ -1,20 +1,21 @@
-import type {
-  PermissionRequest,
-  PolicyDecision
-} from "../../core-types/src/index.js";
+import type { PermissionRequest } from "../../core-types/src/index.js";
 import type { GuardianResult } from "../../guardian/src/index.js";
 import type { ComposedRiskResult } from "../../composed-risk/src/index.js";
 import type { SandboxResult } from "../../sandbox/src/index.js";
+import type { SelfTrustResult } from "../../self-trust/src/index.js";
+import {
+  createDecisionContext,
+  type DecisionContext,
+  type PolicyEngine
+} from "../../decision-context/src/index.js";
 
 export interface FinalDecision {
   mode: "allowed" | "sandboxed" | "denied" | "requiresApproval";
   reason: string;
 }
 
-export type PolicyEngine = (request: PermissionRequest) => PolicyDecision;
-
 export interface SandboxExecutor {
-  execute(request: PermissionRequest): SandboxResult;
+  execute(context: DecisionContext): SandboxResult;
 }
 
 export interface GuardianAnalyzer {
@@ -30,12 +31,25 @@ export class Orchestrator {
     private readonly policyEngine: PolicyEngine,
     private readonly sandboxEngine: SandboxExecutor,
     private readonly guardian: GuardianAnalyzer,
-    private readonly composedRisk: ComposedRiskEvaluator
+    private readonly composedRisk: ComposedRiskEvaluator,
+    private readonly selfTrustResult: SelfTrustResult = {
+      trustLevel: "trusted",
+      reason: "SomaGuard self-trust is trusted by default for this simulation."
+    }
   ) {}
 
   handle(request: PermissionRequest): FinalDecision {
-    const policyDecision = this.policyEngine(request);
-    const sandboxDecision = this.sandboxEngine.execute(request);
+    const context = createDecisionContext(request, this.policyEngine);
+
+    if (this.selfTrustResult.trustLevel === "compromised") {
+      return {
+        mode: "denied",
+        reason: `System self-trust is compromised, so SomaGuard denies the request before other decisions: ${this.selfTrustResult.reason}`
+      };
+    }
+
+    const { policyDecision } = context;
+    const sandboxDecision = this.sandboxEngine.execute(context);
     const guardianResult = this.guardian.analyze();
     const composedRiskResult = this.composedRisk.evaluate();
 
@@ -43,6 +57,16 @@ export class Orchestrator {
       return {
         mode: "denied",
         reason: `Policy denied the request: ${policyDecision.reason}`
+      };
+    }
+
+    if (
+      this.selfTrustResult.trustLevel === "degraded" &&
+      policyDecision.riskLevel !== "low"
+    ) {
+      return {
+        mode: "sandboxed",
+        reason: `System self-trust is degraded, so non-low-risk requests cannot be fully allowed: ${this.selfTrustResult.reason}`
       };
     }
 
@@ -74,4 +98,3 @@ export class Orchestrator {
     };
   }
 }
-

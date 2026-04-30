@@ -11,6 +11,7 @@ import { Orchestrator } from "../packages/orchestrator/src/index.js";
 import type { SandboxResult } from "../packages/sandbox/src/index.js";
 import type { GuardianResult } from "../packages/guardian/src/index.js";
 import type { ComposedRiskResult } from "../packages/composed-risk/src/index.js";
+import type { SelfTrustResult } from "../packages/self-trust/src/index.js";
 
 const app: AppIdentity = {
   id: "app-test",
@@ -81,6 +82,7 @@ function buildOrchestrator(input: {
   sandbox: SandboxResult;
   guardian?: GuardianResult;
   composedRisk?: ComposedRiskResult;
+  selfTrustResult?: SelfTrustResult;
 }) {
   return new Orchestrator(
     () => input.policy,
@@ -96,7 +98,8 @@ function buildOrchestrator(input: {
           riskLevel: "low",
           reason: "Composed risk is low."
         }
-    }
+    },
+    input.selfTrustResult
   );
 }
 
@@ -196,5 +199,115 @@ describe("Orchestrator", () => {
     expect(finalDecision.mode).toBe("denied");
     expect(finalDecision.reason).toContain("Policy denied");
   });
-});
 
+  it("compromised self-trust overrides everything", () => {
+    const orchestrator = buildOrchestrator({
+      policy: policyDecision({ decision: "allow", riskLevel: "low" }),
+      sandbox: {
+        mode: "allowed",
+        reason: "Low-risk simulated request was allowed.",
+        simulated: true
+      },
+      guardian: {
+        flagged: false,
+        reason: null
+      },
+      composedRisk: {
+        riskLevel: "low",
+        reason: "Composed risk is low."
+      },
+      selfTrustResult: {
+        trustLevel: "compromised",
+        reason: "Integrity check failed."
+      }
+    });
+
+    const finalDecision = orchestrator.handle(request("low"));
+
+    expect(finalDecision.mode).toBe("denied");
+    expect(finalDecision.reason).toContain("self-trust is compromised");
+  });
+
+  it("degraded self-trust restricts high risk", () => {
+    const orchestrator = buildOrchestrator({
+      policy: policyDecision({ decision: "allow", riskLevel: "high" }),
+      sandbox: {
+        mode: "sandboxed",
+        reason: "High-risk simulated request requires containment.",
+        simulated: true
+      },
+      selfTrustResult: {
+        trustLevel: "degraded",
+        reason: "The guardian component is missing."
+      }
+    });
+
+    const finalDecision = orchestrator.handle(request("high"));
+
+    expect(finalDecision.mode).toBe("sandboxed");
+    expect(finalDecision.reason).toContain("self-trust is degraded");
+    expect(finalDecision.reason).toContain("non-low-risk");
+  });
+
+  it("trusted self-trust behaves as before", () => {
+    const orchestrator = buildOrchestrator({
+      policy: policyDecision({ decision: "allow", riskLevel: "low" }),
+      sandbox: {
+        mode: "allowed",
+        reason: "Low-risk simulated request was allowed.",
+        simulated: true
+      },
+      selfTrustResult: {
+        trustLevel: "trusted",
+        reason: "All expected components are present."
+      }
+    });
+
+    const finalDecision = orchestrator.handle(request("low"));
+
+    expect(finalDecision.mode).toBe("allowed");
+    expect(finalDecision.reason).toContain("Policy allowed");
+  });
+
+  it("evaluates policy exactly once and reuses the decision context", () => {
+    const sharedDecision = policyDecision({
+      decision: "allow",
+      riskLevel: "low",
+      reason: "Single evaluation decision."
+    });
+    let policyCalls = 0;
+    let sandboxSawSharedDecision = false;
+
+    const orchestrator = new Orchestrator(
+      () => {
+        policyCalls += 1;
+        return sharedDecision;
+      },
+      {
+        execute: (context) => {
+          sandboxSawSharedDecision = context.policyDecision === sharedDecision;
+          return {
+            mode: "allowed",
+            reason: "Sandbox reused the decision context.",
+            simulated: true
+          };
+        }
+      },
+      {
+        analyze: () => ({ flagged: false, reason: null })
+      },
+      {
+        evaluate: () => ({
+          riskLevel: "low",
+          reason: "Composed risk is low."
+        })
+      }
+    );
+
+    const finalDecision = orchestrator.handle(request("low"));
+
+    expect(finalDecision.mode).toBe("allowed");
+    expect(policyCalls).toBe(1);
+    expect(sandboxSawSharedDecision).toBe(true);
+  });
+});

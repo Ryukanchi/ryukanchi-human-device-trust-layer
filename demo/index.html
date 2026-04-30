@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SomaGuard Demo</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="page-header">
+        <div>
+          <p class="kicker">Simulation-only trust layer</p>
+          <h1>SomaGuard Demo</h1>
+        </div>
+      </header>
+
+      <section class="panel controls-panel" aria-labelledby="scenario-heading">
+        <div>
+          <h2 id="scenario-heading">Scenario Selection</h2>
+          <p class="muted">Choose a deterministic mock flow and run it through the local decision stack.</p>
+        </div>
+
+        <div class="controls">
+          <div class="control-field">
+            <label for="scenario-select">Scenario</label>
+            <select id="scenario-select">
+              <option value="safe-flow">Safe Flow</option>
+              <option value="risk-accumulation">Risk Accumulation</option>
+              <option value="critical-attempt">Critical Attempt</option>
+            </select>
+          </div>
+          <div class="control-field">
+            <label for="trust-select">System Trust</label>
+            <select id="trust-select">
+              <option value="trusted">Trusted</option>
+              <option value="degraded">Degraded (missing component)</option>
+              <option value="compromised">Compromised (integrity false)</option>
+            </select>
+          </div>
+          <button id="run-button" type="button">Run Scenario</button>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="stack">
+          <section class="panel integrity-panel" aria-labelledby="integrity-heading">
+            <h2 id="integrity-heading">System Integrity</h2>
+            <div class="integrity-state">
+              <span>Trust Level</span>
+              <strong id="trust-level">Not run</strong>
+            </div>
+            <p id="trust-reason" class="integrity-reason">No self-trust check has run yet.</p>
+          </section>
+
+          <section class="panel results-panel" aria-labelledby="results-heading">
+            <h2 id="results-heading">Results Panel</h2>
+            <div class="result-list">
+              <article class="result-row">
+                <span>Final Decision</span>
+                <strong id="final-decision">Not run</strong>
+                <p id="final-reason">Select a scenario and run it.</p>
+              </article>
+              <article class="result-row">
+                <span>Guardian Result</span>
+                <strong id="guardian-result">Not run</strong>
+                <p id="guardian-reason">No audit history analyzed yet.</p>
+              </article>
+              <article class="result-row">
+                <span>Composed Risk</span>
+                <strong id="composed-risk">Not run</strong>
+                <p id="composed-reason">No composed risk calculated yet.</p>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel audit-panel" aria-labelledby="audit-heading">
+          <h2 id="audit-heading">Audit Log Panel</h2>
+          <ol id="audit-log" class="audit-log">
+            <li class="empty-log">No events recorded.</li>
+          </ol>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
