@@ -9,7 +9,8 @@ import type {
 import {
   AuditLog,
   createAuditEvent,
-  logDecision
+  logDecision,
+  verifyAuditChain
 } from "../packages/audit-log/src/index.js";
 
 const app: AppIdentity = {
@@ -95,11 +96,20 @@ describe("AuditLog", () => {
     expect(events[1]?.timestamp).toBe("2026-01-01T00:00:01.000Z");
   });
 
-  it("clear resets the log", () => {
+  it("clear resets the log for test/demo lifecycle only", () => {
     const auditLog = new AuditLog();
 
     logDecision(request, decision, auditLog);
     auditLog.clear();
+
+    expect(auditLog.getAll()).toEqual([]);
+  });
+
+  it("resetForTestOnly explicitly resets the log for test/demo lifecycle", () => {
+    const auditLog = new AuditLog();
+
+    logDecision(request, decision, auditLog);
+    auditLog.resetForTestOnly();
 
     expect(auditLog.getAll()).toEqual([]);
   });
@@ -130,5 +140,134 @@ describe("AuditLog", () => {
     expect(event.reason).toBe(decision.reason);
     expect(event.humanReadableSummary).toContain(decision.reason);
   });
-});
 
+  it("recorded events receive sequence numbers", () => {
+    const auditLog = new AuditLog();
+
+    logDecision(request, decision, auditLog);
+    logDecision(
+      {
+        ...request,
+        id: "request-2"
+      },
+      {
+        ...decision,
+        requestId: "request-2"
+      },
+      auditLog
+    );
+
+    const events = auditLog.getAll();
+
+    expect(events[0]?.sequenceNumber).toBe(1);
+    expect(events[1]?.sequenceNumber).toBe(2);
+    expect(events[0]?.schemaVersion).toBe("audit-chain-v1");
+    expect(events[1]?.schemaVersion).toBe("audit-chain-v1");
+  });
+
+  it("first event has previousEventHash null", () => {
+    const auditLog = new AuditLog();
+
+    logDecision(request, decision, auditLog);
+
+    const [event] = auditLog.getAll();
+
+    expect(event?.previousEventHash).toBeNull();
+    expect(event?.eventHash).toEqual(expect.any(String));
+  });
+
+  it("second event references first event hash", () => {
+    const auditLog = new AuditLog();
+
+    logDecision(request, decision, auditLog);
+    logDecision(
+      {
+        ...request,
+        id: "request-2"
+      },
+      {
+        ...decision,
+        requestId: "request-2"
+      },
+      auditLog
+    );
+
+    const events = auditLog.getAll();
+
+    expect(events[1]?.previousEventHash).toBe(events[0]?.eventHash);
+  });
+
+  it("verifyAuditChain returns valid for untouched logs", () => {
+    const auditLog = new AuditLog();
+
+    logDecision(request, decision, auditLog);
+    logDecision(
+      {
+        ...request,
+        id: "request-2"
+      },
+      {
+        ...decision,
+        requestId: "request-2"
+      },
+      auditLog
+    );
+
+    expect(verifyAuditChain(auditLog.getAll())).toEqual({
+      valid: true,
+      reason: null
+    });
+  });
+
+  it("verifyAuditChain detects modified event content", () => {
+    const auditLog = new AuditLog();
+
+    logDecision(request, decision, auditLog);
+
+    const [event] = auditLog.getAll();
+    const tamperedEvents = [
+      {
+        ...event,
+        reason: "Tampered reason."
+      }
+    ];
+
+    const result = verifyAuditChain(tamperedEvents);
+
+    expect(result.valid).toBe(false);
+    expect(result.reason).toContain("hash does not match");
+    expect(result.brokenAtSequenceNumber).toBe(1);
+  });
+
+  it("verifyAuditChain detects broken previous hash", () => {
+    const auditLog = new AuditLog();
+
+    logDecision(request, decision, auditLog);
+    logDecision(
+      {
+        ...request,
+        id: "request-2"
+      },
+      {
+        ...decision,
+        requestId: "request-2"
+      },
+      auditLog
+    );
+
+    const events = auditLog.getAll();
+    const tamperedEvents = [
+      events[0],
+      {
+        ...events[1],
+        previousEventHash: "broken-previous-hash"
+      }
+    ];
+
+    const result = verifyAuditChain(tamperedEvents);
+
+    expect(result.valid).toBe(false);
+    expect(result.reason).toContain("previous hash");
+    expect(result.brokenAtSequenceNumber).toBe(2);
+  });
+});

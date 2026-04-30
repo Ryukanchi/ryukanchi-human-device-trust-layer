@@ -82,6 +82,10 @@ export interface AuditEvent {
   audit: boolean;
   sandboxed: boolean;
   humanReadableSummary: string;
+  sequenceNumber?: number;
+  previousEventHash?: string | null;
+  eventHash?: string;
+  schemaVersion?: string;
   simulationOnly: true;
 }
 
